@@ -13,13 +13,14 @@ function CdnUpload(build_opts_raw) {
 
     const readFile = (filename, uploadItem, s3client) => {
         let uploadParams = {
-            Bucket: config.AWS.bucket,
+            Bucket: config.AWS.Bucket,
             Key: '',
             Body: ''
         };
         const source = fs.createReadStream(filename);
         source.on('error', err => {
-            console.log('Error while reading file- ', err)
+            console.log('Error while reading file- ', err);
+            throw err;
         });
         uploadParams.Body = source;
         let path = require('path');
@@ -28,6 +29,7 @@ function CdnUpload(build_opts_raw) {
             if (err) {
                 console.log("Error while uploading file ", uploadParams.Key);
                 console.log(err);
+                throw err;
             }
             if (data) {
                 console.log("Successfully Uploaded file- ", uploadParams.Key);
@@ -52,60 +54,60 @@ function CdnUpload(build_opts_raw) {
 
     // Get CA file based on buildenvironment
     const GetCAFile = (function (build_opts_raw) {
-        GetBuildEnvironment
-            .then(() => {
-                console.log(`Getting CA File ${caFile}`);
-                fs.readdir(build_opts.build_dir, (err, items) => {
-                    const consulOptions = Object.freeze({
-                        url: config.jenkinsConsulUrl,
-                        ca: fs.readFileSync(caFile),
-                    });
-                    request.get(consulOptions, (consulError, consulResponse, consulBody) => {
-                        if (consulError) {
-                            throw (consulError);
-                        }
-                        if (consulResponse.statusCode !== 200 && consulResponse.statusCode !== 302) {
-                            throw (consulResponse.statusCode);
-                        }
-                        const consulRespJson = JSON.parse(consulBody);
-                        const b64token = consulRespJson[0].Value;
-                        const vaultToken = (Buffer.from(b64token, 'base64').toString('ascii'));
-                        const vaultOptions = {
-                            url: config.vaultSecretUrl,
-                            ca: fs.readFileSync(caFile),
-                            headers: {'X-Vault-Token': vaultToken},
-                        };
-                        request.get(vaultOptions, (vaultError, vaultResponse, vaultBody) => {
-                            if (vaultError) {
-                                throw (vaultError);
-                            }
-                            if (vaultResponse.statusCode !== 200 && vaultResponse.statusCode !== 302) {
-                                throw (vaultResponse.statusCode);
-                            }
-                            const vaultdata = JSON.parse(vaultBody);
-                            const awscreds = vaultdata.data;
-                            console.log('got AWS credentials');
-                            const s3client = new AWS.S3({
-                                apiVersion: config.AWS.apiVersion,
-                                region: config.AWS.region,
-                                credentials: {
-                                    accessKeyId: awscreds.AccessKeyId,
-                                    secretAccessKey: awscreds.SecretAccessKey
-                                }
-                            })
-                            console.log('starting upload of assets');
-                            for (const item of items) {
-                                const directoryPath = build_opts.build_dir + item;
-                                const stats = fs.statSync(directoryPath);
-                                stats.isDirectory() ? readDirectory(directoryPath, s3client) : readFile(directoryPath, item, s3client);
-                            }
-                        });
-                    });
-                });
-            })
-            .catch((error) => {
-                throw error;
+        console.log(`Getting CA File ${caFile}`);
+        fs.readdir(build_opts.build_dir, (err, items) => {
+            const consulOptions = Object.freeze({
+                url: config.jenkinsConsulUrl,
+                ca: fs.readFileSync(caFile),
             });
+            request.get(consulOptions, (consulError, consulResponse, consulBody) => {
+                if (consulError) {
+                    console.log("Consul Error- ", consulError)
+                    throw (consulError);
+                }
+                if (consulResponse.statusCode !== 200 && consulResponse.statusCode !== 302) {
+                    console.log("Consul Response- ", consulResponse.statusCode)
+                    throw (consulResponse.statusCode);
+                }
+                const consulRespJson = JSON.parse(consulBody);
+                const b64token = consulRespJson[0].Value;
+                const vaultToken = (Buffer.from(b64token, 'base64').toString('ascii'));
+                const vaultOptions = {
+                    url: config.config.vaultSecretUrl,
+                    ca: fs.readFileSync(caFile),
+                    headers: {'X-Vault-Token': vaultToken},
+                };
+                request.get(vaultOptions, (vaultError, vaultResponse, vaultBody) => {
+                    if (vaultError) {
+                        console.log("Vault Error: ", vaultError)
+                        throw (vaultError);
+                    }
+                    if (vaultResponse.statusCode !== 200 && vaultResponse.statusCode !== 302) {
+                        console.log("Vault Unexpected Status Code- ", vaultResponse.statusCode)
+                        throw (vaultResponse.statusCode);
+                    }
+                    const vaultdata = JSON.parse(vaultBody);
+                    console.log('got AWS credentials');
+                    AWS.config.update({
+                        region: config.AWS.region,
+                        credentials: {
+                            accessKeyId: vaultdata.data.AccessKeyID,
+                            secretAccessKey: vaultdata.data.SecretAccessKey
+                        }
+                    })
+                    const s3client = new AWS.S3({
+                        apiVersion: config.AWS.apiVersion,
+                        region: config.AWS.region,
+                    })
+                    console.log('starting upload of assets');
+                    for (const item of items) {
+                        const directoryPath = build_opts.build_dir + item;
+                        const stats = fs.statSync(directoryPath);
+                        stats.isDirectory() ? readDirectory(directoryPath, s3client) : readFile(directoryPath, item, s3client);
+                    }
+                });
+            });
+        });
     }());
 }
 
