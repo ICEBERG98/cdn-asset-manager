@@ -1,6 +1,6 @@
 {
   "name": "cdn-asset-manager",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "CDN asset manager can be used to upload CDN resource to an S3 bucket and then serve this via a cloudfront distribution.",
   "main": "index.js",
   "scripts": {
@@ -15,5 +15,9 @@
   "bugs": {
     "url": "https://github.com/navinds25/cdn-asset-manager/issues"
   },
-  "homepage": "https://github.com/navinds25/cdn-asset-manager#readme"
+  "homepage": "https://github.com/navinds25/cdn-asset-manager#readme",
+  "dependencies": {
+    "aws-sdk": "^2.700.0",
+    "request": "^2.88.2"
+  }
 }
