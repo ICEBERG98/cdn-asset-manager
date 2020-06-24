@@ -15,5 +15,8 @@
   "bugs": {
     "url": "https://github.com/navinds25/cdn-asset-manager/issues"
   },
-  "homepage": "https://github.com/navinds25/cdn-asset-manager#readme"
+  "homepage": "https://github.com/navinds25/cdn-asset-manager#readme",
+  "devDependencies": {
+    "aws-sdk": "^2.703.0"
+  }
 }
