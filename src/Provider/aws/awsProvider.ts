@@ -1,7 +1,9 @@
 import AWS from 'aws-sdk';
 
 
-class AWSCredentials implements credentialsInterface {
+// Please Try to instantiate the factory defined in Services/ServiceFactory.ts instead of instantiating the below
+// Classes Directly.
+export class AWSCredentials implements credentialsInterface {
     constructor(accessKey?: string, secret?: string) {
         if (accessKey) {
             this.authFactorPrimary = accessKey;
@@ -41,33 +43,30 @@ class AWSCredentials implements credentialsInterface {
     }
 }
 
-class AWSProvider implements providerInterface {
+export class AWSProvider implements providerInterface {
     set credentials(value: AWSCredentials) {
         this._credentials = value;
     }
+
     name = 'AWS';
     private _credentials = new AWSCredentials();
     region = '';
     apiVersion = '';
 
-    constructor(params) {
-        let properties = ['region', 'apiVersion', 'credentials']
-        // Property Existence Checks
-        properties.forEach((property) =>{
-            if (!property.hasOwnProperty(property)){
-                let err = new Error('Missing required property- '+property);
-                console.error(err);
-                throw err;
-            }
-        });
-        properties.forEach((property) =>{
-
-        })
-        this.region = params.region
-        this.apiVersion = params.apiVersion
-        this
+    constructor(region: string, apiVersion: string, credentials: AWSCredentials) {
+        this.region = region;
+        this.apiVersion = apiVersion;
+        this.credentials = credentials;
     }
 
+    setConfig = () => {
+        AWS.config.update({
+            region: this.region,
+            apiVersion: this.apiVersion,
+        })
+    }
 
-
+    authenticate = () => {
+        this._credentials.authenticate()
+    }
 }
