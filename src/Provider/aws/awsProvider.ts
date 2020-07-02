@@ -1,72 +1,58 @@
 import AWS from 'aws-sdk';
-
+import fs from 'fs';
 
 // Please Try to instantiate the factory defined in Services/ServiceFactory.ts instead of instantiating the below
 // Classes Directly.
-export class AWSCredentials implements credentialsInterface {
-    constructor(accessKey?: string, secret?: string) {
-        if (accessKey) {
-            this.authFactorPrimary = accessKey;
-        }
-        if (secret) {
-            this.secret = secret;
-        }
-    }
+class AWSClient implements providerActions {
+    args: providerArgs;
+    region: string;
+    private client: AWS.S3;
 
-    private _authFactorPrimary = ''; // Enter AccessKeyId Here
-
-    set authFactorPrimary(value: string) {
-        this._authFactorPrimary = value;
-    }
-
-    private _secret = '' // SecretAccessKeyHere
-
-    set secret(value: string) {
-        this._secret = value;
-    }
-
-    authenticate = () => {
-        if (this._authFactorPrimary === '' || this._secret === '') {
-            let err = new Error("Either AccessKey or SecretKey is \'\'");
-            console.error(err);
-            throw err;
-        } else {
-            AWS.config.update(
-                {
-                    credentials: {
-                        accessKeyId: this._authFactorPrimary,
-                        secretAccessKey: this._secret
-                    }
-                }
-            );
-        }
-    }
-}
-
-export class AWSProvider implements providerInterface {
-    set credentials(value: AWSCredentials) {
-        this._credentials = value;
-    }
-
-    name = 'AWS';
-    private _credentials = new AWSCredentials();
-    region = '';
-    apiVersion = '';
-
-    constructor(region: string, apiVersion: string, credentials: AWSCredentials) {
+    constructor(args: providerArgs, region: string) {
+        this.args = args;
         this.region = region;
-        this.apiVersion = apiVersion;
-        this.credentials = credentials;
+        this.createClient();
     }
 
-    setConfig = () => {
+    uploadFile = (filePath: string) => {
+        // Recursively Traverse a directory and upload files.
+        const stats = fs.statSync(this.args.filePath);
+        if (stats.isDirectory()) {
+            fs.readdir(filePath, (err, files) => {
+                if (err) {
+                    console.log(err)
+                    throw err;
+                }
+                files.forEach(
+                    (file) => {
+                        this.uploadFile(file)
+                    }
+                )
+            })
+        } else {
+            this.client.upload({
+                Bucket: this.args.bucketName,
+                Key: filePath,
+                Body: fs.createReadStream(filePath)
+            })
+        }
+    }
+
+    upload = () => {
+        this.uploadFile(this.args.filePath)
+    }
+
+    createClient = () => {
         AWS.config.update({
             region: this.region,
-            apiVersion: this.apiVersion,
+            apiVersion: "2006-03-01",
+            credentials: {
+                // @ts-ignore
+                accessKeyId: this.args.credentials.id,
+                // @ts-ignore
+                secretKey: this.args.credentials.key
+            }
         })
-    }
-
-    authenticate = () => {
-        this._credentials.authenticate()
+        this.client = new AWS.S3();
     }
 }
